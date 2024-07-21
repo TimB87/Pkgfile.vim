@@ -17,14 +17,15 @@ runtime! syntax/bash.vim
 syn case match
 " }}}
 
-syn match pDescription /^# Description:/ contained
-syn match pValidDescription /[[:alnum:]\s#,\-'].\{16,79}/ contained contains=pDescription
-syn match pInvalidDescription /[^[:alnum:]\s#\-,']\|.\{80,}/ contained contains=pValidDescription,pDescription
-syn match pDescriptionGroup /^# Description:.*$/ contains=pValidDescription,pInvalidDescription,pDescription
+syn match pDescriptionStart /^# Description:/ contained
+syn region pDescriptionGroup start=+^# Description:+ end=+$+ contains=pValidDescription,pInvalidDescription oneline
+syn match pValidDescription /^\(# Description:\s\+\zs.\{,64}\)/ contained containedin=pDescriptionGroup
+syn match pInvalidDescription /\%>64v.\+/ contained containedin=pDescriptionGroup
 
-syn match pValidURL /\(https\|http\|ftp\)\?:\/\/\(\w\+\(:\w\+\)\?@\)\?\([A-Za-z][-_0-9A-Za-z]*\.\)\{1,}\(\w\{2,}\.\?\)\{1,}\(:[0-9]\{1,5}\)\?\S*/ contained
-syn match pInvalidURL /\(\(?!^\(https\|http\|ftp\)\?:\/\/\(\w\+\(:\w\+\)\?@\)\?\([A-Za-z][-_0-9A-Za-z]*\.\)\{1,}\(\w\{2,}\.\?\)\{1,}\(:[0-9]\{1,5}\)\?\S*$\)\_.\)*/ contained contains=pValidURL
-syn match pURLGroup /^# URL:.*$/ contains=pValidURL,pInvalidURL
+syn match pURLPrefix /^# URL:\s*/ contained
+syn match pValidURL /\vhttps?:\/\/[[:alnum:]\/_#.-]+/ contained
+syn match pInvalidURL /\vhttps?:\/\/[[:alnum:]%\/_#.-]*\s+/ contained
+syn region pURLGroup start=/^# URL:/ end=/$/ contains=pURLPrefix,pValidURL,pInvalidURL
 
 syn match pMaintainer /^# Maintainer:/ contained
 syn match pValidMaintainer /\([[:alnum:],'\-#:\n ]\)/ contained contains=pMaintainer
@@ -35,6 +36,11 @@ syn match pDependsOn /^# Depends on:/ contained
 syn match pValidDependsOn /\([[:alnum:]#:\- ]\)/ contained contains=pDependsOn
 syn match pInvalidDependsOn /\([^[:alnum:]#:\- ]\)/ contained contains=pValidDependsOn,pDependsOn
 syn match pDependsOn /^# Depends on:.*$/ contains=pValidDependsOn,pInvalidDependsOn,pDependsOn
+
+syn match pOptional /^# Optional:/ contained
+syn match pValidOptional /\([[:alnum:]#:\- ]\)/ contained contains=pOptional
+syn match pInvalidOptional /\([^[:alnum:]#:\- ]\)/ contained contains=pValidOptional,pOptional
+syn match pOptional /^# Optional:.*$/ contains=pValidOptional,pInvalidOptional,pOptional
 
 syn match pName /^name=/ contained
 syn match pValidName /[[a-z0-9\-+=_]/ contained contains=pName
@@ -51,22 +57,31 @@ syn match pValidRelease /[1-9]\+[0-9]*/ contained contains=pRelease
 syn match pInvalidRelease /\<0\>\|[^[:digit:]=]/ contained contains=pValidRelease,pRelease
 syn match pReleaseGroup /^release=.*$/ contains=pValidRelease,pInvalidRelease,pRelease
 
+syn match pSourceKeyword /^source/ contained
+syn match pSourceEquals /\v\=/ contained
+syn region pSourceRegion start="^\s*source\s*=" end=/)/ keepend contains=pSourceKeyword,pSourceEquals,pValidSourceURL,pInvalidSourceURL,pFile,pVariable,pSourceParens,pWhitespace
+syn match pSourceParens /[()]/ contained containedin=pSourceRegion
+syn match pWhitespace /\s\+/ contained containedin=pSourceRegion
+syn match pValidSourceURL /\(https\?:\/\/\|ftp:\/\/\)[a-zA-Z0-9._\/$\-{}]*[a-zA-Z0-9\/]/ contained containedin=pSourceRegion
+syn match pInvalidSourceURL /\(http\?:\/\/.*\.dl\.sourceforge\.net\)/ contained containedin=pSourceRegion
+syn match pFile /\<[a-zA-Z0-9._-]\+\.\(tar\.[bgx]z2\|tar\|gz\|zip\|rar\|7z\|patch\|txt\|dll\)\>/ contained containedin=pSourceRegion
+syn match pVariable /\$[a-zA-Z_][a-zA-Z0-9_]*/ contained containedin=pSourceRegion
+
 syn clear shStatement
 syn keyword shStatement alias break cd chdir continue eval exec exit kill newgrp pwd read readonly return shift test trap ulimit umask wait
 syn keyword shStatement bg builtin disown export false fg getopts jobs let printf sleep true unalias typeset fc hash history suspend times type bind builtin caller compopt declare dirs disown enable export help logout mapfile popd pushd readarray shopt typeset
 
-syn match pSource /^source=/ contained
-syn match pValidSource /[a-zA-Z0-9\-.]/ contained contains=pSource
-syn match pInvalidSource /\(http\|ftp\|https\).*\.\+\(dl\|download.\?\)\.\(sourceforge\|sf\).net/ contained contains=pSource,pValidSource
-syn match pDerefEmulation /\$[{]\?[[:alnum:]_]*[}]\?/ contained
-syn region pSourceRegion start=/(/ end=/)/ contains=pSource,pInvalidSource,pDerefEmulation
-syn match pSourceGroup /^source=.*/ contains=pValidSource,pInvalidSource,pSourceRegion,pSource
+syn match shellCmd /^\s*\(prt-get\|prt-cache\)\>/ containedin=ALL
 
+syn match validPython3Path /^\s*\/usr\/bin\/python3/ containedin=ALL
+syn match invalidPython3Path /^\s*python3/ containedin=ALL
+
+hi def link pDescriptionStart Comment
+hi def link pDescriptionGroup Comment
 hi def link pValidDescription Identifier
 hi def link pInvalidDescription Error
-"hi def link pDescriptionGroup DiagnosticWarn
-hi def link pDescription Comment
 
+hi def link pURLPrefix Comment
 hi def link pValidURL Identifier
 hi def link pInvalidURL Error
 hi def link pURLGroup Comment
@@ -79,6 +94,10 @@ hi def link pValidDependsOn Identifier
 hi def link pInvalidDependsOn Error
 hi def link pDependsOn Comment
 
+hi def link pValidOptional Structure
+hi def link pInvalidOptional Error
+hi def link pOptional Comment
+
 hi def link pValidName Identifier
 hi def link pInvalidName Error
 hi def link pName Comment
@@ -87,10 +106,18 @@ hi def link pValidVersion Identifier
 hi def link pInvalidVersion Error
 hi def link pVersion Comment
 
+hi def link pSourceKeyword Comment
+hi def link pSourceEquals Comment
+hi def link pSourceParens Delimiter
+hi def link pValidSourceURL Identifier
+hi def link pInvalidSourceURL Error
+hi def link pFile Type
+hi def link pVariable Macro
+
 hi def link pValidRelease Identifier
 hi def link pInvalidRelease Error
 hi def link pRelease Comment
 
-hi def link pInvalidSource Error
-hi def link pSource Comment
-hi def link pDerefEmulation PreProc
+hi def link shellCmd MoreMsg
+"hi def link validPython3Path MoreMsg
+hi def link invalidPython3Path Error
